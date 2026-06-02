@@ -35,6 +35,14 @@ class ConnectCommand extends Command
         if ($connectionKey === '') {
             $connectionKey = $this->ask('Connection key (copy from your Seolful dashboard → Site Settings → Laravel)');
             $connectionKey = trim((string) $connectionKey);
+
+            if ($connectionKey === '') {
+                $this->newLine();
+                $this->components->error('A connection key is required. Copy it from your Seolful dashboard → Site Settings → Laravel tab.');
+                $this->newLine();
+                return self::FAILURE;
+            }
+
             $this->writeEnv('SEOLFUL_CONNECTION_KEY', $connectionKey);
         }
 
