@@ -31,6 +31,8 @@ class SiteCrawlerService
         $crawled = 0;
         $failed  = 0;
 
+        $firstError = null;
+
         foreach ($urls as $url) {
             try {
                 $data = $this->analyzePage($url);
@@ -41,6 +43,7 @@ class SiteCrawlerService
                 $crawled++;
             } catch (\Throwable $e) {
                 Log::warning("Seolful crawl failed for {$url}: " . $e->getMessage());
+                $firstError ??= $e->getMessage();
                 $failed++;
             }
 
@@ -58,6 +61,7 @@ class SiteCrawlerService
             'crawled'          => $crawled,
             'failed'           => $failed,
             'total'            => $total,
+            'first_error'      => $firstError,
             'discovery_method' => $this->discoveryMethod,
         ];
     }
