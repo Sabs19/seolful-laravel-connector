@@ -1,0 +1,92 @@
+<?php
+
+namespace Seolful\Connector\Http\Controllers;
+
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Seolful\Connector\Events\SeolfulFixApplied;
+use Seolful\Connector\Models\SeoPage;
+use Seolful\Connector\SeolfulHelper;
+
+class UpdateSeoController extends Controller
+{
+    public function store(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'post_id'          => 'required|integer',
+            'meta_title'       => 'sometimes|string|max:255',
+            'meta_description' => 'sometimes|string|max:500',
+            'image_src'        => 'sometimes|string',
+            'image_alt'        => 'sometimes|string',
+        ]);
+
+        $page    = SeoPage::findOrFail($data['post_id']);
+        $updated = [];
+
+        if (isset($data['meta_title'])) {
+            $page->title = $data['meta_title'];
+            $updated[]   = 'meta_title';
+        }
+
+        if (isset($data['meta_description'])) {
+            $page->meta_description = $data['meta_description'];
+            $updated[]              = 'meta_description';
+        }
+
+        if (isset($data['image_src'], $data['image_alt'])) {
+            $alts = $page->image_alts ?? [];
+            foreach ($alts as &$img) {
+                if ($img['src'] === $data['image_src']) {
+                    $img['alt']     = $data['image_alt'];
+                    $img['missing'] = false;
+                    break;
+                }
+            }
+            unset($img);
+            $page->image_alts = $alts;
+            $updated[]        = 'image_alt';
+        }
+
+        $page->save();
+        SeolfulHelper::forgetUrl($page->url);
+
+        event(new SeolfulFixApplied($page, $updated, $data));
+
+        return response()->json([
+            'status'         => 'success',
+            'fields_updated' => $updated,
+        ]);
+    }
+
+    public function updateAiVisibility(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'post_id'          => 'sometimes|integer',
+            'llms_txt_content' => 'sometimes|string',
+            'schema_jsonld'    => 'sometimes|array',
+        ]);
+
+        $updated = [];
+
+        if (isset($data['llms_txt_content'])) {
+            file_put_contents(public_path('llms.txt'), $data['llms_txt_content']);
+            $updated[] = 'llms_txt_content';
+        }
+
+        if (isset($data['schema_jsonld'], $data['post_id'])) {
+            $page                  = SeoPage::findOrFail($data['post_id']);
+            $page->structured_data = $data['schema_jsonld'];
+            $page->save();
+            SeolfulHelper::forgetUrl($page->url);
+            $updated[] = 'schema_jsonld';
+
+            event(new SeolfulFixApplied($page, $updated, $data));
+        }
+
+        return response()->json([
+            'status'         => 'success',
+            'fields_updated' => $updated,
+        ]);
+    }
+}
