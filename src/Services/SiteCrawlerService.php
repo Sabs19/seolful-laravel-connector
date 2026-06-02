@@ -11,6 +11,7 @@ use Seolful\Connector\Models\SeoPage;
 class SiteCrawlerService
 {
     private string $appUrl;
+    private string $discoveryMethod = 'unknown';
 
     public function __construct()
     {
@@ -21,7 +22,7 @@ class SiteCrawlerService
      * Crawl the site and upsert SEO data into seolful_seo_pages.
      *
      * @param  callable|null  $onProgress  fn(string $url, int $done, int $total)
-     * @return array{crawled: int, failed: int}
+     * @return array{crawled: int, failed: int, total: int, discovery_method: string}
      */
     public function crawl(?callable $onProgress = null): array
     {
@@ -53,13 +54,19 @@ class SiteCrawlerService
             }
         }
 
-        return ['crawled' => $crawled, 'failed' => $failed];
+        return [
+            'crawled'          => $crawled,
+            'failed'           => $failed,
+            'total'            => $total,
+            'discovery_method' => $this->discoveryMethod,
+        ];
     }
 
     private function discoverUrls(): array
     {
         $explicit = config('seolful.crawl.urls', []);
         if (! empty($explicit)) {
+            $this->discoveryMethod = 'config list';
             return $explicit;
         }
 
@@ -67,10 +74,12 @@ class SiteCrawlerService
             $sitemapUrl = config('seolful.crawl.sitemap_url') ?: $this->appUrl . '/sitemap.xml';
             $urls       = $this->parseSitemap($sitemapUrl);
             if (! empty($urls)) {
+                $this->discoveryMethod = 'sitemap.xml';
                 return $urls;
             }
         }
 
+        $this->discoveryMethod = 'route list';
         return $this->discoverFromRoutes();
     }
 
