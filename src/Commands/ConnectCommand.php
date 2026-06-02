@@ -16,11 +16,28 @@ class ConnectCommand extends Command
 
     public function handle(): int
     {
-        $appUrl  = rtrim((string) config('seolful.app_url'), '/');
-        $siteUrl = rtrim((string) config('app.url'), '/');
+        $appUrl        = rtrim((string) config('seolful.app_url'), '/');
+        $siteUrl       = rtrim((string) config('app.url'), '/');
+        $connectionKey = (string) config('seolful.connection_key', '');
 
         $this->newLine();
         $this->components->info('Connecting to Seolful');
+        $this->newLine();
+
+        // Prompt for missing SEOLFUL_APP_URL
+        if ($appUrl === '' || $appUrl === 'https://app.seolful.com') {
+            $appUrl = $this->ask('Seolful app URL (from your dashboard)');
+            $appUrl = rtrim((string) $appUrl, '/');
+            $this->writeEnv('SEOLFUL_APP_URL', $appUrl);
+        }
+
+        // Prompt for missing SEOLFUL_CONNECTION_KEY
+        if ($connectionKey === '') {
+            $connectionKey = $this->ask('Connection key (copy from your Seolful dashboard → Site Settings → Laravel)');
+            $connectionKey = trim((string) $connectionKey);
+            $this->writeEnv('SEOLFUL_CONNECTION_KEY', $connectionKey);
+        }
+
         $this->newLine();
         $this->components->twoColumnDetail('<fg=gray>Seolful app</>', $appUrl);
         $this->components->twoColumnDetail('<fg=gray>Site URL</>', $siteUrl);
@@ -41,8 +58,8 @@ class ConnectCommand extends Command
         $success = false;
         $error   = null;
 
-        $this->components->task('Registering with Seolful', function () use ($appUrl, $clientId, $token, $siteUrl, &$success, &$error) {
-            $response = Http::timeout(15)->post("{$appUrl}/api/plugin/handshake", [
+        $this->components->task('Registering with Seolful', function () use ($appUrl, $clientId, $token, $siteUrl, $connectionKey, &$success, &$error) {
+            $payload = [
                 'client_id'       => $clientId,
                 'token'           => $token,
                 'site_url'        => $siteUrl,
@@ -50,7 +67,13 @@ class ConnectCommand extends Command
                 'php_version'     => PHP_VERSION,
                 'platform'        => 'laravel',
                 'laravel_version' => app()->version(),
-            ]);
+            ];
+
+            if ($connectionKey !== '') {
+                $payload['connection_key'] = $connectionKey;
+            }
+
+            $response = Http::timeout(15)->post("{$appUrl}/api/plugin/handshake", $payload);
 
             if (! $response->successful()) {
                 $error = 'HTTP ' . $response->status() . ' — ' . substr($response->body(), 0, 200);
@@ -65,7 +88,7 @@ class ConnectCommand extends Command
             $this->newLine();
             $this->components->error('Handshake failed: ' . ($error ?? 'Unknown error'));
             $this->newLine();
-            $this->line('  <fg=gray>Check that SEOLFUL_APP_URL is correct in your .env and the Seolful app is reachable.</>');
+            $this->line('  <fg=gray>Check that SEOLFUL_APP_URL and SEOLFUL_CONNECTION_KEY are correct.</>');
             $this->newLine();
             return self::FAILURE;
         }
@@ -85,5 +108,25 @@ class ConnectCommand extends Command
         $this->newLine();
 
         return self::SUCCESS;
+    }
+
+    private function writeEnv(string $key, string $value): void
+    {
+        $envPath = base_path('.env');
+
+        if (! file_exists($envPath)) {
+            return;
+        }
+
+        $contents = file_get_contents($envPath);
+
+        // Replace existing key or append
+        if (preg_match("/^{$key}=.*/m", $contents)) {
+            $contents = preg_replace("/^{$key}=.*/m", "{$key}={$value}", $contents);
+        } else {
+            $contents .= PHP_EOL . "{$key}={$value}";
+        }
+
+        file_put_contents($envPath, $contents);
     }
 }

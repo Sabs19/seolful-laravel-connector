@@ -8,6 +8,12 @@ return [
     'app_url' => env('SEOLFUL_APP_URL', 'https://app.seolful.com'),
 
     /*
+     * User-specific connection key copied from the Seolful dashboard.
+     * Required so Seolful knows which account to assign this site to.
+     */
+    'connection_key' => env('SEOLFUL_CONNECTION_KEY'),
+
+    /*
      * URL prefix for the package's API routes exposed on this site.
      */
     'api_prefix' => 'api/seolful/v1',
