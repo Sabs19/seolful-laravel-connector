@@ -78,7 +78,11 @@ class SeolfulServiceProvider extends ServiceProvider
                 true,
                 flags: JSON_THROW_ON_ERROR
             );
-            $appUrl = rtrim((string) ($decoded['url'] ?? ''), '/');
+
+            $envAppUrl = rtrim((string) env('SEOLFUL_APP_URL', ''), '/');
+            $appUrl    = ($envAppUrl !== '' && $envAppUrl !== 'https://app.seolful.com')
+                ? $envAppUrl
+                : rtrim((string) ($decoded['url'] ?? ''), '/');
 
             if ($appUrl === '') {
                 return;

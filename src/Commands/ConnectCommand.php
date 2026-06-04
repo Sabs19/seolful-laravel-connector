@@ -38,8 +38,12 @@ class ConnectCommand extends Command
             $this->writeEnv('SEOLFUL_CONNECTION_KEY', $connectionKey);
         }
 
-        // The Seolful app URL is embedded in the key — no separate SEOLFUL_APP_URL needed.
-        $appUrl = $this->extractAppUrl($connectionKey);
+        // Prefer SEOLFUL_APP_URL if explicitly set in .env (backward compat for existing installs).
+        // For new installs the URL is decoded from the connection key — no separate env var needed.
+        $appUrl = rtrim((string) env('SEOLFUL_APP_URL', ''), '/');
+        if ($appUrl === '' || $appUrl === 'https://app.seolful.com') {
+            $appUrl = $this->extractAppUrl($connectionKey);
+        }
 
         if ($appUrl === '') {
             $this->newLine();
