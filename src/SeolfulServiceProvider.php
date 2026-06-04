@@ -3,11 +3,18 @@
 namespace Seolful\Connector;
 
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 use Seolful\Connector\Commands\ConnectCommand;
 use Seolful\Connector\Commands\CrawlCommand;
 use Seolful\Connector\Http\Middleware\SeolfulInjectionMiddleware;
+use Seolful\Connector\Models\SeolfulConnection;
 use Seolful\Connector\Services\SiteCrawlerService;
+use Throwable;
 
 class SeolfulServiceProvider extends ServiceProvider
 {
@@ -25,6 +32,10 @@ class SeolfulServiceProvider extends ServiceProvider
                 ConnectCommand::class,
                 CrawlCommand::class,
             ]);
+
+            // Auto-connect when SEOLFUL_CONNECTION_KEY is set but no connection exists yet.
+            // Runs only during artisan/console boot so it never slows down web requests.
+            $this->app->booted(fn () => $this->attemptAutoConnect());
         }
 
         $this->registerInjectionMiddleware();
@@ -36,6 +47,86 @@ class SeolfulServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../config/seolful.php', 'seolful');
 
         $this->app->singleton(SiteCrawlerService::class);
+    }
+
+    // -------------------------------------------------------------------------
+
+    private function attemptAutoConnect(): void
+    {
+        $key = (string) config('seolful.connection_key', '');
+        if ($key === '') {
+            return;
+        }
+
+        // Bail out if already connected. Catch DB exceptions (e.g. table not yet migrated).
+        try {
+            if (SeolfulConnection::exists()) {
+                return;
+            }
+        } catch (Throwable) {
+            return;
+        }
+
+        // Back off if a recent attempt failed to avoid hammering the API.
+        if (Cache::has('seolful_autoconnect_backoff')) {
+            return;
+        }
+
+        try {
+            $decoded = json_decode(
+                base64_decode(strtr($key, '-_', '+/')),
+                true,
+                flags: JSON_THROW_ON_ERROR
+            );
+            $appUrl = rtrim((string) ($decoded['url'] ?? ''), '/');
+
+            if ($appUrl === '') {
+                return;
+            }
+
+            $clientId = Str::random(12);
+            $token    = Str::random(40);
+            $siteUrl  = rtrim((string) config('app.url'), '/');
+
+            $response = Http::timeout(15)->post("{$appUrl}/api/plugin/handshake", [
+                'client_id'         => $clientId,
+                'token'             => $token,
+                'site_url'          => $siteUrl,
+                'site_name'         => config('app.name'),
+                'php_version'       => PHP_VERSION,
+                'platform'          => 'laravel',
+                'laravel_version'   => app()->version(),
+                'connection_key'    => $key,
+                'connector_version' => $this->connectorVersion(),
+            ]);
+
+            if ($response->successful()) {
+                SeolfulConnection::query()->delete();
+                SeolfulConnection::create([
+                    'client_id'    => $clientId,
+                    'token_hash'   => Hash::make($token),
+                    'site_url'     => $siteUrl,
+                    'connected_at' => now(),
+                ]);
+                Log::info('Seolful: auto-connected successfully via SEOLFUL_CONNECTION_KEY.');
+            } else {
+                Cache::put('seolful_autoconnect_backoff', true, now()->addMinutes(5));
+                Log::warning('Seolful: auto-connect failed.', ['status' => $response->status()]);
+            }
+        } catch (Throwable $e) {
+            Cache::put('seolful_autoconnect_backoff', true, now()->addMinutes(5));
+            Log::warning('Seolful: auto-connect failed.', ['error' => $e->getMessage()]);
+        }
+    }
+
+    private function connectorVersion(): ?string
+    {
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            try {
+                return \Composer\InstalledVersions::getPrettyVersion('seolful/laravel-connector');
+            } catch (Throwable) {}
+        }
+        return null;
     }
 
     // -------------------------------------------------------------------------

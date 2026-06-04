@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Seolful\Connector\Models\SeolfulConnection;
+use Throwable;
 
 class ConnectCommand extends Command
 {
@@ -16,22 +17,13 @@ class ConnectCommand extends Command
 
     public function handle(): int
     {
-        $appUrl        = rtrim((string) config('seolful.app_url'), '/');
-        $siteUrl       = rtrim((string) config('app.url'), '/');
         $connectionKey = (string) config('seolful.connection_key', '');
+        $siteUrl       = rtrim((string) config('app.url'), '/');
 
         $this->newLine();
         $this->components->info('Connecting to Seolful');
         $this->newLine();
 
-        // Prompt for missing SEOLFUL_APP_URL
-        if ($appUrl === '' || $appUrl === 'https://app.seolful.com') {
-            $appUrl = $this->ask('Seolful app URL (from your dashboard)');
-            $appUrl = rtrim((string) $appUrl, '/');
-            $this->writeEnv('SEOLFUL_APP_URL', $appUrl);
-        }
-
-        // Prompt for missing SEOLFUL_CONNECTION_KEY
         if ($connectionKey === '') {
             $connectionKey = $this->ask('Connection key (copy from your Seolful dashboard → Site Settings → Laravel)');
             $connectionKey = trim((string) $connectionKey);
@@ -44,6 +36,16 @@ class ConnectCommand extends Command
             }
 
             $this->writeEnv('SEOLFUL_CONNECTION_KEY', $connectionKey);
+        }
+
+        // The Seolful app URL is embedded in the key — no separate SEOLFUL_APP_URL needed.
+        $appUrl = $this->extractAppUrl($connectionKey);
+
+        if ($appUrl === '') {
+            $this->newLine();
+            $this->components->error('The connection key appears to be invalid. Copy a fresh one from your Seolful dashboard.');
+            $this->newLine();
+            return self::FAILURE;
         }
 
         $this->newLine();
@@ -67,21 +69,17 @@ class ConnectCommand extends Command
         $error   = null;
 
         $this->components->task('Registering with Seolful', function () use ($appUrl, $clientId, $token, $siteUrl, $connectionKey, &$success, &$error) {
-            $payload = [
-                'client_id'       => $clientId,
-                'token'           => $token,
-                'site_url'        => $siteUrl,
-                'site_name'       => config('app.name'),
-                'php_version'     => PHP_VERSION,
-                'platform'        => 'laravel',
-                'laravel_version' => app()->version(),
-            ];
-
-            if ($connectionKey !== '') {
-                $payload['connection_key'] = $connectionKey;
-            }
-
-            $response = Http::timeout(15)->post("{$appUrl}/api/plugin/handshake", $payload);
+            $response = Http::timeout(15)->post("{$appUrl}/api/plugin/handshake", [
+                'client_id'         => $clientId,
+                'token'             => $token,
+                'site_url'          => $siteUrl,
+                'site_name'         => config('app.name'),
+                'php_version'       => PHP_VERSION,
+                'platform'          => 'laravel',
+                'laravel_version'   => app()->version(),
+                'connection_key'    => $connectionKey,
+                'connector_version' => $this->connectorVersion(),
+            ]);
 
             if (! $response->successful()) {
                 $error = 'HTTP ' . $response->status() . ' — ' . substr($response->body(), 0, 200);
@@ -96,7 +94,7 @@ class ConnectCommand extends Command
             $this->newLine();
             $this->components->error('Handshake failed: ' . ($error ?? 'Unknown error'));
             $this->newLine();
-            $this->line('  <fg=gray>Check that SEOLFUL_APP_URL and SEOLFUL_CONNECTION_KEY are correct.</>');
+            $this->line('  <fg=gray>Check that your connection key is correct and has not expired.</>');
             $this->newLine();
             return self::FAILURE;
         }
@@ -112,10 +110,34 @@ class ConnectCommand extends Command
         $this->newLine();
         $this->components->info('Site connected successfully.');
         $this->newLine();
-        $this->line('  <fg=gray>Next step:</> run <fg=yellow>php artisan seolful:crawl</> to index your pages.');
+        $this->line('  <fg=gray>Next step:</> sync your site from the Seolful dashboard — the first sync will crawl and index your pages automatically.');
         $this->newLine();
 
         return self::SUCCESS;
+    }
+
+    private function extractAppUrl(string $connectionKey): string
+    {
+        try {
+            $decoded = json_decode(
+                base64_decode(strtr($connectionKey, '-_', '+/')),
+                true,
+                flags: JSON_THROW_ON_ERROR
+            );
+            return rtrim((string) ($decoded['url'] ?? ''), '/');
+        } catch (Throwable) {
+            return '';
+        }
+    }
+
+    private function connectorVersion(): ?string
+    {
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            try {
+                return \Composer\InstalledVersions::getPrettyVersion('seolful/laravel-connector');
+            } catch (Throwable) {}
+        }
+        return null;
     }
 
     private function writeEnv(string $key, string $value): void
@@ -128,7 +150,6 @@ class ConnectCommand extends Command
 
         $contents = file_get_contents($envPath);
 
-        // Replace existing key or append
         if (preg_match("/^{$key}=.*/m", $contents)) {
             $contents = preg_replace("/^{$key}=.*/m", "{$key}={$value}", $contents);
         } else {
