@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Seolful\Connector\Models\SeoPage;
+use Throwable;
 
 class AuditDataController extends Controller
 {
@@ -38,11 +39,22 @@ class AuditDataController extends Controller
         });
 
         return response()->json([
-            'data'         => $items,
-            'current_page' => $pages->currentPage(),
-            'last_page'    => $pages->lastPage(),
-            'per_page'     => $pages->perPage(),
-            'total'        => $pages->total(),
+            'data'              => $items,
+            'current_page'      => $pages->currentPage(),
+            'last_page'         => $pages->lastPage(),
+            'per_page'          => $pages->perPage(),
+            'total'             => $pages->total(),
+            'connector_version' => $this->connectorVersion(),
         ]);
+    }
+
+    private function connectorVersion(): ?string
+    {
+        if (class_exists(\Composer\InstalledVersions::class)) {
+            try {
+                return \Composer\InstalledVersions::getPrettyVersion('seolful/laravel-connector');
+            } catch (Throwable) {}
+        }
+        return null;
     }
 }
