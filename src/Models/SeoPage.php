@@ -14,6 +14,9 @@ class SeoPage extends Model
         'title',
         'meta_description',
         'h1',
+        'h1_count',
+        'h1_secondary',
+        'demote_h1',
         'word_count',
         'image_alts',
         'internal_link_count',
@@ -27,6 +30,7 @@ class SeoPage extends Model
         'image_alts'      => 'array',
         'structured_data' => 'array',
         'noindex'         => 'boolean',
+        'demote_h1'       => 'boolean',
         'crawled_at'      => 'datetime',
     ];
 }

@@ -176,12 +176,16 @@ class SiteCrawlerService
         libxml_clear_errors();
         $xpath = new DOMXPath($dom);
 
+        $h1s = $this->extractAllH1s($xpath);
+
         return [
             'url'                 => $url,
             'slug'                => parse_url($url, PHP_URL_PATH) ?: '/',
             'title'               => $this->extractTitle($xpath),
             'meta_description'    => $this->extractMetaDescription($xpath),
-            'h1'                  => $this->extractFirstH1($xpath),
+            'h1'                  => $h1s[0] ?? null,
+            'h1_count'            => count($h1s),
+            'h1_secondary'        => $h1s[1] ?? null,
             'word_count'          => $this->countWords($xpath),
             'image_alts'          => $this->extractImageAlts($xpath),
             'internal_link_count' => $this->countInternalLinks($xpath, $url),
@@ -203,10 +207,19 @@ class SiteCrawlerService
         return $nodes->length > 0 ? trim($nodes->item(0)->nodeValue) ?: null : null;
     }
 
-    private function extractFirstH1(DOMXPath $xpath): ?string
+    private function extractAllH1s(DOMXPath $xpath): array
     {
-        $nodes = $xpath->query('//h1');
-        return $nodes->length > 0 ? trim($nodes->item(0)->textContent) ?: null : null;
+        $nodes  = $xpath->query('//h1');
+        $texts  = [];
+
+        for ($i = 0; $i < $nodes->length; $i++) {
+            $text = trim($nodes->item($i)->textContent);
+            if ($text !== '') {
+                $texts[] = $text;
+            }
+        }
+
+        return $texts;
     }
 
     private function countWords(DOMXPath $xpath): int

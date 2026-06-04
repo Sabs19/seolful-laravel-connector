@@ -54,6 +54,10 @@ class SeolfulInjectionMiddleware
             $html = $this->injectSchema($html, $page->structured_data);
         }
 
+        if ($page->demote_h1) {
+            $html = $this->demoteSecondaryH1s($html);
+        }
+
         if ($html !== $original) {
             $response->setContent($html);
         }
@@ -129,6 +133,28 @@ class SeolfulInjectionMiddleware
         }
 
         return $result;
+    }
+
+    private function demoteSecondaryH1s(string $html): string
+    {
+        $count = 0;
+
+        return preg_replace_callback(
+            '/<h1(\s[^>]*)?>.*?<\/h1>/is',
+            function (array $match) use (&$count): string {
+                $count++;
+
+                if ($count === 1) {
+                    return $match[0];
+                }
+
+                $tag = preg_replace('/^<h1/i', '<h2', $match[0]);
+                $tag = preg_replace('/<\/h1>$/i', '</h2>', $tag ?? $match[0]);
+
+                return $tag ?? $match[0];
+            },
+            $html
+        ) ?? $html;
     }
 
     private function injectSchema(string $html, array $schemas): string

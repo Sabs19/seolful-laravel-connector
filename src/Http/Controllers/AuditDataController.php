@@ -22,9 +22,11 @@ class AuditDataController extends Controller
 
             return [
                 'url'                => $page->url,
+                'post_id'            => $page->id,
                 'title'              => $page->title,
                 'meta_description'   => $page->meta_description,
-                'h1_in_content'      => $page->h1,
+                'h1_in_content'      => $page->h1_count > 1,
+                'h1_text'            => $page->h1_count > 1 ? $page->h1_secondary : null,
                 'word_count'         => $page->word_count,
                 'images_missing_alt' => array_map(fn($img) => ['src' => $img['src']], $missingAltImages),
                 'internal_links'     => $page->internal_link_count,
@@ -32,7 +34,6 @@ class AuditDataController extends Controller
                 'is_noindexed'       => $page->noindex,
                 'canonical_url'      => $page->canonical_url,
                 'page_builder'       => null,
-                'post_id'            => $page->id,
             ];
         });
 
