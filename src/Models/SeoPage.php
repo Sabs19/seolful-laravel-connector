@@ -33,4 +33,44 @@ class SeoPage extends Model
         'demote_h1'       => 'boolean',
         'crawled_at'      => 'datetime',
     ];
+
+    /**
+     * Classify this page as 'content', 'legal', or 'utility' using the same
+     * slug-pattern and word-count rules as the WordPress plugin.
+     */
+    public function getPageRole(): string
+    {
+        $slug = strtolower(trim($this->slug ?? '', '/'));
+        $lastSegment = basename($slug);
+
+        $legalPatterns = [
+            'privacy', 'terms', 'tos', 'cookie', 'disclaimer',
+            'gdpr', 'legal', 'refund', 'return-policy', 'dmca',
+            'accessibility', 'copyright',
+        ];
+        foreach ($legalPatterns as $pattern) {
+            if ($lastSegment === $pattern || str_contains($lastSegment, $pattern)) {
+                return 'legal';
+            }
+        }
+
+        $utilityPatterns = [
+            'login', 'log-in', 'register', 'sign-in', 'sign-up', 'signup',
+            'lost-password', 'reset-password', 'forgot-password',
+            'search', 'sitemap', 'thank-you', 'thankyou',
+            'coming-soon', 'maintenance', '404',
+            'cart', 'checkout', 'my-account',
+        ];
+        foreach ($utilityPatterns as $pattern) {
+            if ($lastSegment === $pattern || str_contains($lastSegment, $pattern)) {
+                return 'utility';
+            }
+        }
+
+        if ((int) ($this->word_count ?? 0) < 50) {
+            return 'utility';
+        }
+
+        return 'content';
+    }
 }
