@@ -11,6 +11,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Seolful\Connector\Commands\ConnectCommand;
 use Seolful\Connector\Commands\CrawlCommand;
+use Seolful\Connector\Commands\InstallCommand;
 use Seolful\Connector\Http\Middleware\SeolfulInjectionMiddleware;
 use Seolful\Connector\Models\SeolfulConnection;
 use Seolful\Connector\Services\SiteCrawlerService;
@@ -29,6 +30,7 @@ class SeolfulServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                InstallCommand::class,
                 ConnectCommand::class,
                 CrawlCommand::class,
             ]);

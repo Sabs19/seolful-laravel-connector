@@ -11,13 +11,13 @@ use Throwable;
 
 class ConnectCommand extends Command
 {
-    protected $signature = 'seolful:connect';
+    protected $signature = 'seolful:connect {key? : Connection key from your Seolful dashboard}';
 
     protected $description = 'Connect this Laravel site to Seolful for SEO auditing';
 
     public function handle(): int
     {
-        $connectionKey = (string) config('seolful.connection_key', '');
+        $connectionKey = $this->resolveConnectionKey();
         $siteUrl       = rtrim((string) config('app.url'), '/');
 
         $this->newLine();
@@ -25,17 +25,10 @@ class ConnectCommand extends Command
         $this->newLine();
 
         if ($connectionKey === '') {
-            $connectionKey = $this->ask('Connection key (copy from your Seolful dashboard → Site Settings → Laravel)');
-            $connectionKey = trim((string) $connectionKey);
-
-            if ($connectionKey === '') {
-                $this->newLine();
-                $this->components->error('A connection key is required. Copy it from your Seolful dashboard → Site Settings → Laravel tab.');
-                $this->newLine();
-                return self::FAILURE;
-            }
-
-            $this->writeEnv('SEOLFUL_CONNECTION_KEY', $connectionKey);
+            $this->newLine();
+            $this->components->error('A connection key is required. Copy it from your Seolful dashboard → Site Settings → Laravel tab.');
+            $this->newLine();
+            return self::FAILURE;
         }
 
         // Prefer SEOLFUL_APP_URL if explicitly set in .env (backward compat for existing installs).
@@ -118,6 +111,18 @@ class ConnectCommand extends Command
         $this->newLine();
 
         return self::SUCCESS;
+    }
+
+    private function resolveConnectionKey(): string
+    {
+        $fromArg = trim((string) $this->argument('key'));
+
+        if ($fromArg !== '') {
+            $this->writeEnv('SEOLFUL_CONNECTION_KEY', $fromArg);
+            return $fromArg;
+        }
+
+        return (string) config('seolful.connection_key', '');
     }
 
     private function extractAppUrl(string $connectionKey): string
