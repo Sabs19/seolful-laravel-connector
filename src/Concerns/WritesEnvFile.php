@@ -6,13 +6,16 @@ trait WritesEnvFile
 {
     protected function writeEnv(string $key, string $value): void
     {
-        $envPath = base_path('.env');
+        $this->writeEnvTo(base_path('.env'), $key, $value);
+    }
 
+    protected function writeEnvTo(string $envPath, string $key, string $value): void
+    {
         if (! file_exists($envPath)) {
-            return;
+            file_put_contents($envPath, '');
         }
 
-        $contents = file_get_contents($envPath);
+        $contents = (string) file_get_contents($envPath);
 
         if (preg_match("/^{$key}=.*/m", $contents)) {
             $contents = preg_replace("/^{$key}=.*/m", "{$key}={$value}", $contents);
