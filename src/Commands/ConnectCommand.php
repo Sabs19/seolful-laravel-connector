@@ -55,10 +55,12 @@ class ConnectCommand extends Command
         $this->newLine();
 
         if (SeolfulConnection::count() > 0) {
-            if (! $this->confirm('A connection already exists. Reconnect and issue new credentials?')) {
-                return self::SUCCESS;
+            if ($this->input->isInteractive()) {
+                if (! $this->confirm('A connection already exists. Reconnect and issue new credentials?')) {
+                    return self::SUCCESS;
+                }
+                $this->newLine();
             }
-            $this->newLine();
         }
 
         $clientId = Str::random(12);
