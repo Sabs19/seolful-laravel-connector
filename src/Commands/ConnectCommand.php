@@ -6,11 +6,13 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Seolful\Connector\Concerns\WritesEnvFile;
 use Seolful\Connector\Models\SeolfulConnection;
 use Throwable;
 
 class ConnectCommand extends Command
 {
+    use WritesEnvFile;
     protected $signature = 'seolful:connect {key? : Connection key from your Seolful dashboard}';
 
     protected $description = 'Connect this Laravel site to Seolful for SEO auditing';
@@ -149,22 +151,4 @@ class ConnectCommand extends Command
         return null;
     }
 
-    private function writeEnv(string $key, string $value): void
-    {
-        $envPath = base_path('.env');
-
-        if (! file_exists($envPath)) {
-            return;
-        }
-
-        $contents = file_get_contents($envPath);
-
-        if (preg_match("/^{$key}=.*/m", $contents)) {
-            $contents = preg_replace("/^{$key}=.*/m", "{$key}={$value}", $contents);
-        } else {
-            $contents .= PHP_EOL . "{$key}={$value}";
-        }
-
-        file_put_contents($envPath, $contents);
-    }
 }
