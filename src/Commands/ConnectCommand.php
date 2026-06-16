@@ -66,10 +66,11 @@ class ConnectCommand extends Command
         $clientId = Str::random(12);
         $token    = Str::random(40);
 
-        $success = false;
-        $error   = null;
+        $success    = false;
+        $error      = null;
+        $newKey     = null;
 
-        $this->components->task('Registering with Seolful', function () use ($appUrl, $clientId, $token, $siteUrl, $connectionKey, &$success, &$error) {
+        $this->components->task('Registering with Seolful', function () use ($appUrl, $clientId, $token, $siteUrl, $connectionKey, &$success, &$error, &$newKey) {
             $response = Http::timeout(15)->post("{$appUrl}/api/plugin/handshake", [
                 'client_id'         => $clientId,
                 'token'             => $token,
@@ -88,6 +89,7 @@ class ConnectCommand extends Command
             }
 
             $success = true;
+            $newKey  = $response->json('new_connection_key');
             return true;
         });
 
@@ -107,6 +109,12 @@ class ConnectCommand extends Command
             'site_url'     => $siteUrl,
             'connected_at' => now(),
         ]);
+
+        // Persist the rotated connection key so future reconnects work without
+        // the user copying a fresh key from the dashboard manually.
+        if ($newKey) {
+            $this->writeEnv('SEOLFUL_CONNECTION_KEY', $newKey);
+        }
 
         $this->newLine();
         $this->components->info('Site connected successfully.');
