@@ -8,6 +8,7 @@ use Illuminate\Routing\Controller;
 use Seolful\Connector\Events\SeolfulFixApplied;
 use Seolful\Connector\Models\SeoPage;
 use Seolful\Connector\SeolfulHelper;
+use Seolful\Connector\Services\WebhookDispatchService;
 
 class DemoteH1Controller extends Controller
 {
@@ -24,6 +25,8 @@ class DemoteH1Controller extends Controller
         SeolfulHelper::forgetUrl($page->url);
 
         event(new SeolfulFixApplied($page, ['h1'], $data));
+
+        app(WebhookDispatchService::class)->dispatch($page->url);
 
         return response()->json([
             'status'         => 'success',

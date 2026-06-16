@@ -48,6 +48,17 @@ return [
         ],
     ],
 
+    /*
+     * Webhook fired after Seolful publishes any fix to this site.
+     * Set SEOLFUL_REVALIDATE_URL to your Next.js revalidation endpoint so
+     * pages are regenerated immediately after a fix is applied.
+     * Leave empty to disable (safe — the webhook is a no-op when not configured).
+     */
+    'webhook' => [
+        'revalidate_url' => env('SEOLFUL_REVALIDATE_URL', ''),
+        'secret'         => env('SEOLFUL_REVALIDATE_SECRET', ''),
+    ],
+
     'crawl' => [
         /*
          * When true, the crawler tries sitemap.xml first.

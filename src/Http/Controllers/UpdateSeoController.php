@@ -8,6 +8,7 @@ use Illuminate\Routing\Controller;
 use Seolful\Connector\Events\SeolfulFixApplied;
 use Seolful\Connector\Models\SeoPage;
 use Seolful\Connector\SeolfulHelper;
+use Seolful\Connector\Services\WebhookDispatchService;
 
 class UpdateSeoController extends Controller
 {
@@ -53,6 +54,8 @@ class UpdateSeoController extends Controller
 
         event(new SeolfulFixApplied($page, $updated, $data));
 
+        app(WebhookDispatchService::class)->dispatch($page->url);
+
         return response()->json([
             'status'         => 'success',
             'fields_updated' => $updated,
@@ -82,6 +85,8 @@ class UpdateSeoController extends Controller
             $updated[] = 'schema_jsonld';
 
             event(new SeolfulFixApplied($page, $updated, $data));
+
+            app(WebhookDispatchService::class)->dispatch($page->url);
         }
 
         return response()->json([
