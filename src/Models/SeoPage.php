@@ -43,31 +43,36 @@ class SeoPage extends Model
         $slug = strtolower(trim($this->slug ?? '', '/'));
         $lastSegment = basename($slug);
 
-        $legalPatterns = [
-            'privacy', 'terms', 'tos', 'cookie', 'disclaimer',
-            'gdpr', 'legal', 'refund', 'return-policy', 'dmca',
-            'accessibility', 'copyright', 'cancellation',
+        $legalExact = ['privacy', 'terms', 'tos', 'cookie', 'cookies', 'disclaimer', 'legal', 'refund', 'copyright', 'cancellation'];
+        if (in_array($lastSegment, $legalExact, true)) {
+            return 'legal';
+        }
+
+        $legalSubstring = [
+            'privacy-policy', 'cookie-policy', 'terms-of-service', 'terms-and-conditions',
+            'return-policy', 'refund-policy', 'cancellation-policy',
+            'gdpr', 'dmca', 'accessibility',
         ];
-        foreach ($legalPatterns as $pattern) {
-            if ($lastSegment === $pattern || str_contains($lastSegment, $pattern)) {
+        foreach ($legalSubstring as $pattern) {
+            if (str_contains($lastSegment, $pattern)) {
                 return 'legal';
             }
         }
 
-        $utilityExact = ['contact', 'contact-us', 'about', 'about-us', 'faq', 'faqs'];
+        $utilityExact = ['contact', 'contact-us', 'about', 'about-us', 'faq', 'faqs', 'search', 'sitemap'];
         if (in_array($lastSegment, $utilityExact, true)) {
             return 'utility';
         }
 
-        $utilityPatterns = [
+        $utilitySubstring = [
             'cart', 'checkout', 'my-account', 'wishlist', 'order-received',
             'login', 'log-in', 'register', 'sign-in', 'sign-up', 'signup',
             'lost-password', 'reset-password', 'forgot-password',
-            'search', 'sitemap', 'thank-you', 'thankyou',
+            'thank-you', 'thankyou',
             'coming-soon', 'maintenance', '404',
         ];
-        foreach ($utilityPatterns as $pattern) {
-            if ($lastSegment === $pattern || str_contains($lastSegment, $pattern)) {
+        foreach ($utilitySubstring as $pattern) {
+            if (str_contains($lastSegment, $pattern)) {
                 return 'utility';
             }
         }
