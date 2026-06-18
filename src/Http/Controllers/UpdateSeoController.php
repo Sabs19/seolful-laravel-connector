@@ -26,12 +26,12 @@ class UpdateSeoController extends Controller
         $updated = [];
 
         if (isset($data['meta_title'])) {
-            $page->title = $data['meta_title'];
+            $page->title = self::stripLabelPrefix($data['meta_title']);
             $updated[]   = 'meta_title';
         }
 
         if (isset($data['meta_description'])) {
-            $page->meta_description = $data['meta_description'];
+            $page->meta_description = self::stripLabelPrefix($data['meta_description']);
             $updated[]              = 'meta_description';
         }
 
@@ -60,6 +60,26 @@ class UpdateSeoController extends Controller
             'status'         => 'success',
             'fields_updated' => $updated,
         ]);
+    }
+
+    private static function stripLabelPrefix(string $value): string
+    {
+        $prefixes = [
+            'Meta Description:', 'Meta description:',
+            'Title Tag:', 'Title tag:', 'Title:',
+            'New Title:', 'New Meta Description:',
+            'Revised Title:', 'Revised Meta Description:',
+            'Updated Title:', 'Updated Meta Description:',
+            'H1:', 'H1 Heading:', 'Alt Text:', 'Alt text:',
+        ];
+
+        foreach ($prefixes as $prefix) {
+            if (str_starts_with($value, $prefix)) {
+                return trim(substr($value, strlen($prefix)));
+            }
+        }
+
+        return $value;
     }
 
     public function updateAiVisibility(Request $request): JsonResponse

@@ -4,6 +4,7 @@ namespace Seolful\Connector\Services;
 
 use DOMDocument;
 use DOMXPath;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Seolful\Connector\Models\SeoPage;
@@ -26,20 +27,40 @@ class SiteCrawlerService
      */
     public function crawl(?callable $onProgress = null): array
     {
+        $lock = Cache::lock('seolful:crawling', 300);
+
+        if (! $lock->get()) {
+            return [
+                'crawled'          => 0,
+                'failed'           => 0,
+                'total'            => 0,
+                'first_error'      => 'A crawl is already in progress.',
+                'discovery_method' => 'skipped',
+            ];
+        }
+
+        try {
+            return $this->doCrawl($onProgress);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function doCrawl(?callable $onProgress): array
+    {
         $urls    = $this->discoverUrls();
         $total   = count($urls);
         $crawled = 0;
         $failed  = 0;
 
         $firstError = null;
+        $batch      = [];
+        $delayMs    = (int) config('seolful.crawl.delay_ms', 300);
 
         foreach ($urls as $url) {
             try {
-                $data = $this->analyzePage($url);
-                SeoPage::updateOrCreate(
-                    ['url' => $url],
-                    array_merge($data, ['crawled_at' => now()])
-                );
+                $data    = $this->analyzePage($url);
+                $batch[] = array_merge($data, ['crawled_at' => now()]);
                 $crawled++;
             } catch (\Throwable $e) {
                 Log::warning("Seolful crawl failed for {$url}: " . $e->getMessage());
@@ -47,14 +68,22 @@ class SiteCrawlerService
                 $failed++;
             }
 
+            if (count($batch) >= 20) {
+                $this->flushBatch($batch);
+                $batch = [];
+            }
+
             if ($onProgress) {
                 ($onProgress)($url, $crawled + $failed, $total);
             }
 
-            $delayMs = (int) config('seolful.crawl.delay_ms', 300);
             if ($delayMs > 0) {
                 usleep($delayMs * 1000);
             }
+        }
+
+        if (! empty($batch)) {
+            $this->flushBatch($batch);
         }
 
         return [
@@ -64,6 +93,15 @@ class SiteCrawlerService
             'first_error'      => $firstError,
             'discovery_method' => $this->discoveryMethod,
         ];
+    }
+
+    private function flushBatch(array $rows): void
+    {
+        SeoPage::upsert(
+            $rows,
+            ['url'],
+            ['slug', 'title', 'meta_description', 'h1', 'h1_count', 'h1_secondary', 'word_count', 'image_alts', 'internal_link_count', 'structured_data', 'noindex', 'canonical_url', 'crawled_at']
+        );
     }
 
     private function discoverUrls(): array
