@@ -46,7 +46,7 @@ class SeoPage extends Model
         $legalPatterns = [
             'privacy', 'terms', 'tos', 'cookie', 'disclaimer',
             'gdpr', 'legal', 'refund', 'return-policy', 'dmca',
-            'accessibility', 'copyright',
+            'accessibility', 'copyright', 'cancellation',
         ];
         foreach ($legalPatterns as $pattern) {
             if ($lastSegment === $pattern || str_contains($lastSegment, $pattern)) {
@@ -55,11 +55,11 @@ class SeoPage extends Model
         }
 
         $utilityPatterns = [
+            'cart', 'checkout', 'my-account', 'wishlist', 'order-received',
             'login', 'log-in', 'register', 'sign-in', 'sign-up', 'signup',
             'lost-password', 'reset-password', 'forgot-password',
             'search', 'sitemap', 'thank-you', 'thankyou',
             'coming-soon', 'maintenance', '404',
-            'cart', 'checkout', 'my-account',
         ];
         foreach ($utilityPatterns as $pattern) {
             if ($lastSegment === $pattern || str_contains($lastSegment, $pattern)) {
