@@ -54,6 +54,11 @@ class SeoPage extends Model
             }
         }
 
+        $utilityExact = ['contact', 'contact-us', 'about', 'about-us', 'faq', 'faqs'];
+        if (in_array($lastSegment, $utilityExact, true)) {
+            return 'utility';
+        }
+
         $utilityPatterns = [
             'cart', 'checkout', 'my-account', 'wishlist', 'order-received',
             'login', 'log-in', 'register', 'sign-in', 'sign-up', 'signup',
