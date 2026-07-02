@@ -115,7 +115,7 @@ class InstallCommand extends Command
             if (! $this->isNextJsProject($resolvedPath)) {
                 $this->newLine();
                 $this->components->warn("No Next.js project found at {$resolvedPath} — skipping file generation.");
-                $this->line('  Run <fg=yellow>npx seolful-next init</> inside your Next.js app instead.');
+                $this->line('  Check the path and re-run with --nextjs-path=/path/to/your/nextjs-app.');
             } else {
                 if ($token === null && $this->input->isInteractive()) {
                     $token = $this->ask('Next.js token (leave blank to auto-generate)') ?: null;
@@ -145,7 +145,8 @@ class InstallCommand extends Command
             $this->line("  SEOLFUL_CONNECTOR_URL={$connectorUrl}");
             $this->line("  SEOLFUL_REVALIDATE_SECRET={$secret}");
             $this->newLine();
-            $this->line('  Or run <fg=yellow>npx seolful-next init</> inside your Next.js app.');
+            $this->line('  For automatic file setup (lib/seolful.ts, SeolfulImage, revalidate route),');
+            $this->line('  re-run with --nextjs-path=/path/to/your/nextjs-app.');
             $this->newLine();
         }
     }
