@@ -13,10 +13,11 @@ class CrawlController extends Controller
         $result = $crawler->crawl();
 
         return response()->json([
-            'status'  => 'success',
-            'crawled' => $result['crawled'],
-            'failed'  => $result['failed'],
-            'total'   => $result['total'],
+            'status'           => 'success',
+            'crawled'          => $result['crawled'],
+            'failed'           => $result['failed'],
+            'total'            => $result['total'],
+            'discovery_method' => $result['discovery_method'] ?? null,
         ]);
     }
 }
