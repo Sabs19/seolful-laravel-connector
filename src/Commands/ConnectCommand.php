@@ -5,7 +5,6 @@ namespace Seolful\Connector\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 use Seolful\Connector\Concerns\WritesEnvFile;
 use Seolful\Connector\Models\SeolfulConnection;
 use Throwable;
@@ -33,18 +32,27 @@ class ConnectCommand extends Command
             return self::FAILURE;
         }
 
-        // Prefer SEOLFUL_APP_URL if explicitly set in .env (backward compat for existing installs).
-        // For new installs the URL is decoded from the connection key — no separate env var needed.
-        $appUrl = rtrim((string) env('SEOLFUL_APP_URL', ''), '/');
-        if ($appUrl === '' || $appUrl === 'https://app.seolful.com') {
-            $appUrl = $this->extractAppUrl($connectionKey);
-        }
+        $decoded = $this->decodeConnectionKey($connectionKey);
 
-        if ($appUrl === '') {
+        if ($decoded === null || $decoded['url'] === '') {
             $this->newLine();
             $this->components->error('The connection key appears to be invalid. Copy a fresh one from your Seolful dashboard.');
             $this->newLine();
             return self::FAILURE;
+        }
+
+        if ($decoded['id'] === '' || $decoded['tok'] === '') {
+            $this->newLine();
+            $this->components->error('This connection key is in an old format — copy a fresh one from your Seolful dashboard.');
+            $this->newLine();
+            return self::FAILURE;
+        }
+
+        // Prefer SEOLFUL_APP_URL if explicitly set in .env (backward compat for existing installs).
+        // For new installs the URL is decoded from the connection key — no separate env var needed.
+        $appUrl = rtrim((string) env('SEOLFUL_APP_URL', ''), '/');
+        if ($appUrl === '' || $appUrl === 'https://app.seolful.com') {
+            $appUrl = $decoded['url'];
         }
 
         $this->newLine();
@@ -63,14 +71,16 @@ class ConnectCommand extends Command
             }
         }
 
-        $clientId = Str::random(12);
-        $token    = Str::random(40);
+        // The app mints client_id/token up front and hands them to us via the
+        // connection key — we no longer invent our own, which is what lets the
+        // app's env-var auth bypass work reliably on serverless deployments.
+        $clientId = $decoded['id'];
+        $token    = $decoded['tok'];
 
-        $success    = false;
-        $error      = null;
-        $newKey     = null;
+        $success = false;
+        $error   = null;
 
-        $this->components->task('Registering with Seolful', function () use ($appUrl, $clientId, $token, $siteUrl, $connectionKey, &$success, &$error, &$newKey) {
+        $this->components->task('Registering with Seolful', function () use ($appUrl, $clientId, $token, $siteUrl, $connectionKey, &$success, &$error) {
             $response = Http::timeout(15)->post("{$appUrl}/api/plugin/handshake", [
                 'client_id'         => $clientId,
                 'token'             => $token,
@@ -89,7 +99,6 @@ class ConnectCommand extends Command
             }
 
             $success = true;
-            $newKey  = $response->json('new_connection_key');
             return true;
         });
 
@@ -109,12 +118,6 @@ class ConnectCommand extends Command
             'site_url'     => $siteUrl,
             'connected_at' => now(),
         ]);
-
-        // Persist the rotated connection key so future reconnects work without
-        // the user copying a fresh key from the dashboard manually.
-        if ($newKey) {
-            $this->writeEnv('SEOLFUL_CONNECTION_KEY', $newKey);
-        }
 
         $this->newLine();
         $this->components->info('Site connected successfully.');
@@ -137,7 +140,10 @@ class ConnectCommand extends Command
         return (string) config('seolful.connection_key', '');
     }
 
-    private function extractAppUrl(string $connectionKey): string
+    /**
+     * @return array{url: string, id: string, tok: string}|null
+     */
+    private function decodeConnectionKey(string $connectionKey): ?array
     {
         try {
             $decoded = json_decode(
@@ -145,9 +151,14 @@ class ConnectCommand extends Command
                 true,
                 flags: JSON_THROW_ON_ERROR
             );
-            return rtrim((string) ($decoded['url'] ?? ''), '/');
+
+            return [
+                'url' => rtrim((string) ($decoded['url'] ?? ''), '/'),
+                'id'  => (string) ($decoded['id'] ?? ''),
+                'tok' => (string) ($decoded['tok'] ?? ''),
+            ];
         } catch (Throwable) {
-            return '';
+            return null;
         }
     }
 
