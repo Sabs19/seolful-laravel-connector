@@ -26,6 +26,7 @@ class AuditDataController extends Controller
                 'post_id'            => $page->id,
                 'title'              => $page->title,
                 'meta_description'   => $page->meta_description,
+                'type'               => $page->getContentType(),
                 'page_role'          => $page->getPageRole(),
                 'h1_in_content'      => $page->h1_count > 1,
                 'h1_text'            => $page->h1_count > 1 ? $page->h1_secondary : null,

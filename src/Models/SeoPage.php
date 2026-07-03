@@ -35,8 +35,32 @@ class SeoPage extends Model
     ];
 
     /**
-     * Classify this page as 'content', 'legal', or 'utility' using the same
-     * slug-pattern and word-count rules as the WordPress plugin.
+     * First URL path segment, e.g. 'products' for '/products/foo-bar'.
+     */
+    private function firstSegment(): string
+    {
+        $slug = strtolower(trim($this->slug ?? '', '/'));
+
+        return $slug === '' ? '' : explode('/', $slug)[0];
+    }
+
+    /**
+     * True when the slug has more than one path segment, i.e. it's a detail
+     * page under a section rather than the section's own index/listing page.
+     * '/products/foo' => true, '/products' => false.
+     */
+    private function hasDetailSegment(): bool
+    {
+        $slug = strtolower(trim($this->slug ?? '', '/'));
+
+        return $slug !== '' && str_contains($slug, '/');
+    }
+
+    /**
+     * Classify this page as 'content', 'legal', 'utility', or 'product' using the
+     * same slug-pattern and word-count rules as the WordPress plugin. Sites without
+     * native post types (Laravel, Next.js) have no ground truth for this, so 'product'
+     * is inferred from URL shape rather than read from a CMS field.
      */
     public function getPageRole(): string
     {
@@ -77,10 +101,34 @@ class SeoPage extends Model
             }
         }
 
+        $productSections = ['product', 'products', 'shop', 'store', 'item', 'items'];
+        if ($this->hasDetailSegment() && in_array($this->firstSegment(), $productSections, true)) {
+            return 'product';
+        }
+
         if ((int) ($this->word_count ?? 0) < 50) {
             return 'utility';
         }
 
         return 'content';
+    }
+
+    /**
+     * Classify this page as 'post', 'product', or 'page' for content-type grouping
+     * (as opposed to getPageRole(), which governs which audit rules apply). Inferred
+     * from URL shape since Laravel/Next.js sites have no native post-type field.
+     */
+    public function getContentType(): string
+    {
+        if ($this->getPageRole() === 'product') {
+            return 'product';
+        }
+
+        $postSections = ['blog', 'post', 'posts', 'news', 'article', 'articles', 'insights'];
+        if ($this->hasDetailSegment() && in_array($this->firstSegment(), $postSections, true)) {
+            return 'post';
+        }
+
+        return 'page';
     }
 }
