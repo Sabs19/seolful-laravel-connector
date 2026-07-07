@@ -31,7 +31,61 @@ class SeolfulHelper
                 ?? false;
         });
 
-        return $result instanceof SeoPage ? $result : null;
+        $dbPage = $result instanceof SeoPage ? $result : null;
+
+        return self::applyFileOverrides($dbPage, $normalised);
+    }
+
+    /**
+     * Layers seolful.overrides.json (committed via the GitHub PR publish flow)
+     * on top of whatever the DB/live-write path already has, keyed by URL path.
+     * File values win field-by-field when present; everything else falls back
+     * to the DB row. Lets a site take either publish path, or both, per fix.
+     */
+    private static function applyFileOverrides(?SeoPage $dbPage, string $url): ?SeoPage
+    {
+        $path     = parse_url($url, PHP_URL_PATH) ?: '/';
+        $override = self::fileOverrides()[$path] ?? null;
+
+        if (! $override) {
+            return $dbPage;
+        }
+
+        $merged = $dbPage ? clone $dbPage : new SeoPage(['url' => $url]);
+
+        if (isset($override['title'])) {
+            $merged->title = $override['title'];
+        }
+        if (isset($override['metaDescription'])) {
+            $merged->meta_description = $override['metaDescription'];
+        }
+        if (isset($override['structuredData'])) {
+            $merged->structured_data = $override['structuredData'];
+        }
+        if (array_key_exists('demoteH1', $override)) {
+            $merged->demote_h1 = (bool) $override['demoteH1'];
+        }
+        if (isset($override['imageAlts'])) {
+            $merged->image_alts = $override['imageAlts'];
+        }
+
+        return $merged;
+    }
+
+    /** @return array<string, array<string, mixed>> keyed by URL path */
+    private static function fileOverrides(): array
+    {
+        return Cache::remember('seolful_file_overrides', 60, function () {
+            $path = base_path('seolful.overrides.json');
+
+            if (! is_file($path)) {
+                return [];
+            }
+
+            $decoded = json_decode(file_get_contents($path), true);
+
+            return is_array($decoded) ? $decoded : [];
+        });
     }
 
     public static function current(): ?SeoPage
