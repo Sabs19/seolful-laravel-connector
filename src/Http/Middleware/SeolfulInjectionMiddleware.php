@@ -58,6 +58,10 @@ class SeolfulInjectionMiddleware
             $html = $this->demoteSecondaryH1s($html);
         }
 
+        if (! empty($page->image_alts)) {
+            $html = $this->applyImageAlts($html, $page->image_alts);
+        }
+
         if ($html !== $original) {
             $response->setContent($html);
         }
@@ -155,6 +159,53 @@ class SeolfulInjectionMiddleware
             },
             $html
         ) ?? $html;
+    }
+
+    /**
+     * Unlike title/description/schema/H1 above, nothing else in this package ever
+     * applied a published image-alt fix to rendered markup — it only ever lived in
+     * $page->image_alts with no reader. Matches each <img> by its src attribute and
+     * sets/replaces its alt, the same regex-on-final-HTML approach as the rest of
+     * this middleware, so no Blade changes are required.
+     *
+     * @param list<array{src?: string, alt?: string}> $imageAlts
+     */
+    private function applyImageAlts(string $html, array $imageAlts): string
+    {
+        foreach ($imageAlts as $entry) {
+            $src = $entry['src'] ?? null;
+            $alt = $entry['alt'] ?? null;
+
+            if (! $src || ! $alt) {
+                continue;
+            }
+
+            $html = $this->setAltForImageSrc($html, $src, $alt);
+        }
+
+        return $html;
+    }
+
+    private function setAltForImageSrc(string $html, string $src, string $alt): string
+    {
+        $safeAlt   = htmlspecialchars($alt, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $quotedSrc = preg_quote($src, '/');
+
+        $result = preg_replace_callback(
+            '/<img\s[^>]*src=["\']' . $quotedSrc . '["\'][^>]*>/i',
+            function (array $match) use ($safeAlt): string {
+                $tag = $match[0];
+
+                if (preg_match('/\salt=["\'][^"\']*["\']/i', $tag)) {
+                    return preg_replace('/\salt=["\'][^"\']*["\']/i', ' alt="' . $safeAlt . '"', $tag, 1) ?? $tag;
+                }
+
+                return preg_replace('/^<img/i', '<img alt="' . $safeAlt . '"', $tag, 1) ?? $tag;
+            },
+            $html
+        );
+
+        return $result ?? $html;
     }
 
     private function injectSchema(string $html, array $schemas): string

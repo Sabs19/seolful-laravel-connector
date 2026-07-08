@@ -37,14 +37,24 @@ class UpdateSeoController extends Controller
 
         if (isset($data['image_src'], $data['image_alt'])) {
             $alts = $page->image_alts ?? [];
+            $found = false;
             foreach ($alts as &$img) {
-                if ($img['src'] === $data['image_src']) {
+                if (($img['src'] ?? null) === $data['image_src']) {
                     $img['alt']     = $data['image_alt'];
                     $img['missing'] = false;
+                    $found          = true;
                     break;
                 }
             }
             unset($img);
+
+            if (! $found) {
+                // The last crawl snapshot didn't have this image yet (added since, or a
+                // CDN/resize variant of a known src) — still apply the fix instead of
+                // silently reporting success while changing nothing.
+                $alts[] = ['src' => $data['image_src'], 'alt' => $data['image_alt'], 'missing' => false];
+            }
+
             $page->image_alts = $alts;
             $updated[]        = 'image_alt';
         }
