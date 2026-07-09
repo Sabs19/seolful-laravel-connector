@@ -97,6 +97,14 @@ class SiteCrawlerService
 
     private function flushBatch(array $rows): void
     {
+        // upsert() is a raw bulk query — it bypasses Eloquent's array casts,
+        // so json-array columns must be encoded manually before binding.
+        foreach ($rows as &$row) {
+            $row['image_alts']      = json_encode($row['image_alts']);
+            $row['structured_data'] = json_encode($row['structured_data']);
+        }
+        unset($row);
+
         SeoPage::upsert(
             $rows,
             ['url'],
