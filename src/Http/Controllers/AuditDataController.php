@@ -33,6 +33,7 @@ class AuditDataController extends Controller
                 'word_count'         => $page->word_count,
                 'images_missing_alt' => array_map(fn($img) => ['src' => $img['src']], $missingAltImages),
                 'internal_links'     => $page->internal_link_count,
+                'all_links'          => $page->all_links ?? [],
                 'structured_data'    => $page->structured_data ?? [],
                 'is_noindexed'       => $page->noindex,
                 'canonical_url'      => $page->canonical_url,

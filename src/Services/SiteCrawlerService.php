@@ -101,6 +101,7 @@ class SiteCrawlerService
         // so json-array columns must be encoded manually before binding.
         foreach ($rows as &$row) {
             $row['image_alts']      = json_encode($row['image_alts']);
+            $row['all_links']       = json_encode($row['all_links']);
             $row['structured_data'] = json_encode($row['structured_data']);
         }
         unset($row);
@@ -108,7 +109,7 @@ class SiteCrawlerService
         SeoPage::upsert(
             $rows,
             ['url'],
-            ['slug', 'title', 'meta_description', 'h1', 'h1_count', 'h1_secondary', 'word_count', 'image_alts', 'internal_link_count', 'structured_data', 'noindex', 'canonical_url', 'crawled_at']
+            ['slug', 'title', 'meta_description', 'h1', 'h1_count', 'h1_secondary', 'word_count', 'image_alts', 'internal_link_count', 'all_links', 'structured_data', 'noindex', 'canonical_url', 'crawled_at']
         );
     }
 
@@ -235,6 +236,7 @@ class SiteCrawlerService
             'word_count'          => $this->countWords($xpath),
             'image_alts'          => $this->extractImageAlts($xpath),
             'internal_link_count' => $this->countInternalLinks($xpath, $url),
+            'all_links'           => $this->extractAllLinks($xpath),
             'structured_data'     => $this->extractStructuredData($xpath),
             'noindex'             => $this->detectNoindex($xpath),
             'canonical_url'       => $this->extractCanonical($xpath),
@@ -320,6 +322,25 @@ class SiteCrawlerService
         }
 
         return $count;
+    }
+
+    /**
+     * Every distinct <a href> target on the page (internal + external) —
+     * feeds the app's BrokenLinkService via the audit-data endpoint.
+     *
+     * @return list<string>
+     */
+    private function extractAllLinks(DOMXPath $xpath): array
+    {
+        $hrefs = [];
+        foreach ($xpath->query('//a[@href]') as $a) {
+            $href = trim($a->getAttribute('href'));
+            if ($href !== '') {
+                $hrefs[] = $href;
+            }
+        }
+
+        return array_values(array_unique($hrefs));
     }
 
     private function extractStructuredData(DOMXPath $xpath): array

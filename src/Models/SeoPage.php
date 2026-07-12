@@ -20,6 +20,7 @@ class SeoPage extends Model
         'word_count',
         'image_alts',
         'internal_link_count',
+        'all_links',
         'structured_data',
         'noindex',
         'canonical_url',
@@ -28,6 +29,7 @@ class SeoPage extends Model
 
     protected $casts = [
         'image_alts'      => 'array',
+        'all_links'       => 'array',
         'structured_data' => 'array',
         'noindex'         => 'boolean',
         'demote_h1'       => 'boolean',
