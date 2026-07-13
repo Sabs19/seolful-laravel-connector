@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Seolful\Connector\Http\Controllers\AuditDataController;
+use Seolful\Connector\Http\Controllers\BulkUpsertPagesController;
 use Seolful\Connector\Http\Controllers\CrawlController;
 use Seolful\Connector\Http\Controllers\DemoteH1Controller;
 use Seolful\Connector\Http\Controllers\PageSeoController;
@@ -18,6 +19,7 @@ Route::prefix($prefix)
     ->group(function () {
         Route::get('audit-data', [AuditDataController::class, 'index']);
         Route::post('crawl', [CrawlController::class, 'store']);
+        Route::post('bulk-upsert-pages', [BulkUpsertPagesController::class, 'store']);
         Route::post('update-seo', [UpdateSeoController::class, 'store']);
         Route::post('update-ai-visibility', [UpdateSeoController::class, 'updateAiVisibility']);
         Route::post('demote-h1', [DemoteH1Controller::class, 'store']);
