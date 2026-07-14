@@ -34,11 +34,17 @@ class SeolfulServiceProvider extends ServiceProvider
                 ConnectCommand::class,
                 CrawlCommand::class,
             ]);
-
-            // Auto-connect when SEOLFUL_CONNECTION_KEY is set but no connection exists yet.
-            // Runs only during artisan/console boot so it never slows down web requests.
-            $this->app->booted(fn () => $this->attemptAutoConnect());
         }
+
+        // Auto-connect when SEOLFUL_CONNECTION_KEY is set but no connection exists yet.
+        // Registered via terminating() rather than booted() so it also fires after
+        // ordinary web requests, not just artisan/console boots — otherwise a site
+        // where nobody ever runs an artisan command after setting the env var (e.g.
+        // shared hosting with no deploy hook) can never complete the handshake without
+        // someone SSHing in to run seolful:connect by hand. terminating() runs after
+        // the response has already been sent, so it adds no latency to the request
+        // that happens to trigger it.
+        $this->app->terminating(fn () => $this->attemptAutoConnect());
 
         $this->registerInjectionMiddleware();
         $this->registerBladeDirectives();
