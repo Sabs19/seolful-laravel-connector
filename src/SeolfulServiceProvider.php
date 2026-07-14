@@ -61,7 +61,17 @@ class SeolfulServiceProvider extends ServiceProvider
 
     private function attemptAutoConnect(): void
     {
+        // config('seolful.connection_key') is blind to anything written to .env
+        // after the framework booted: Laravel's LoadEnvironmentVariables skips
+        // parsing .env entirely once bootstrap/cache/config.php exists (the
+        // config:cache many hosts run on deploy), so env() returns null and this
+        // config value stays empty even though the file on disk was just edited.
+        // Read the raw file directly as a fallback so hand-editing .env still
+        // works without requiring a config:clear.
         $key = (string) config('seolful.connection_key', '');
+        if ($key === '') {
+            $key = $this->rawEnvConnectionKey();
+        }
         if ($key === '') {
             return;
         }
@@ -129,6 +139,23 @@ class SeolfulServiceProvider extends ServiceProvider
             Cache::put('seolful_autoconnect_backoff', true, now()->addMinutes(5));
             Log::warning('Seolful: auto-connect failed.', ['error' => $e->getMessage()]);
         }
+    }
+
+    private function rawEnvConnectionKey(): string
+    {
+        $path = base_path('.env');
+
+        if (! is_file($path) || ! is_readable($path)) {
+            return '';
+        }
+
+        $contents = (string) file_get_contents($path);
+
+        if (! preg_match('/^SEOLFUL_CONNECTION_KEY=(.*)$/m', $contents, $matches)) {
+            return '';
+        }
+
+        return trim($matches[1], " \t\n\r\0\x0B\"'");
     }
 
     private function connectorVersion(): ?string
